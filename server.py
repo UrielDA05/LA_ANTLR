@@ -1,5 +1,6 @@
 import os
 import subprocess
+import shutil
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 import json
 
@@ -22,7 +23,6 @@ class Handler(SimpleHTTPRequestHandler):
 
             nombre_carpeta = os.path.splitext(nombre_archivo)[0]
 
-            # Guardar temporalmente en el servidor
             dir_propio = os.path.join("programas", nombre_carpeta)
             os.makedirs(dir_propio, exist_ok=True)
 
@@ -30,22 +30,27 @@ class Handler(SimpleHTTPRequestHandler):
             with open(ruta_bzl, "w", encoding="utf-8") as f:
                 f.write(codigo_bzl)
 
-            # Ejecutar el compilador
+            # Ejecutar tu compilador bazilio.py
             cmd = ["python3", "bazilio.py", ruta_bzl]
             res = subprocess.run(cmd, capture_output=True, text=True)
 
+            salida = res.stderr.strip() if res.stderr else res.stdout.strip()
+            
+            # Comprimir toda la carpeta de salida en un .zip para enviarla al cliente
+            zip_path = f"{dir_propio}"
+            shutil.make_archive(zip_path, 'zip', dir_propio)
+            
+            # Leer el zip en base64 o enviarlo mediante una ruta de descarga directa
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
             
-            salida = res.stderr.strip() if res.stderr else res.stdout.strip()
-            msg = f"[ÉXITO] Código procesado en el servidor.\n\n{salida or 'Procesado correctamente.'}"
+            msg = f"[ÉXITO] Procesado correctamente.\n\n{salida}"
             
-            # Devuelve tanto el mensaje como el contenido del archivo para descargarlo
+            # Devolvemos la ruta relativa del zip para que la página web lo descargue
             respuesta = {
                 'resultado': msg,
-                'contenido_bzl': codigo_bzl,
-                'nombre_archivo': nombre_archivo
+                'zip_url': f"/{dir_propio}.zip"
             }
             self.wfile.write(json.dumps(respuesta).encode('utf-8'))
 
