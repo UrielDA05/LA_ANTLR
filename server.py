@@ -22,6 +22,7 @@ class Handler(SimpleHTTPRequestHandler):
 
             nombre_carpeta = os.path.splitext(nombre_archivo)[0]
 
+            # Guardar temporalmente en el servidor
             dir_propio = os.path.join("programas", nombre_carpeta)
             os.makedirs(dir_propio, exist_ok=True)
 
@@ -29,6 +30,7 @@ class Handler(SimpleHTTPRequestHandler):
             with open(ruta_bzl, "w", encoding="utf-8") as f:
                 f.write(codigo_bzl)
 
+            # Ejecutar el compilador
             cmd = ["python3", "bazilio.py", ruta_bzl]
             res = subprocess.run(cmd, capture_output=True, text=True)
 
@@ -37,16 +39,19 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             
             salida = res.stderr.strip() if res.stderr else res.stdout.strip()
-            msg = f"Guardado y procesado en: {dir_propio}/\n\n{salida or 'Procesado correctamente.'}"
-            self.wfile.write(json.dumps({'resultado': msg}).encode('utf-8'))
+            msg = f"[ÉXITO] Código procesado en el servidor.\n\n{salida or 'Procesado correctamente.'}"
+            
+            # Devuelve tanto el mensaje como el contenido del archivo para descargarlo
+            respuesta = {
+                'resultado': msg,
+                'contenido_bzl': codigo_bzl,
+                'nombre_archivo': nombre_archivo
+            }
+            self.wfile.write(json.dumps(respuesta).encode('utf-8'))
 
 if __name__ == '__main__':
-    # Render asigna un puerto dinámico mediante os.environ.get("PORT") (por defecto 8000 localmente)
     port = int(os.environ.get("PORT", 8000))
-    
-    # IMPORTANTE: En la nube se usa "0.0.0.0" en lugar de "localhost" para aceptar peticiones externas
     servidor = ('0.0.0.0', port)
-    
     print(f"Servidor Bazilio corriendo en el puerto {port}")
     httpd = HTTPServer(servidor, Handler)
     httpd.serve_forever()
