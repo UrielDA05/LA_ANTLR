@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Bazilio </title></head>
+<body>
+    Archivo: <input id="archivo" value="nombre del archivo"><br><br>
+    Notas / Texto simple:<br>
+    <textarea id="codigo" rows="6" cols="50">Igresa las notaciones</textarea><br><br>
+    
+    <button onclick="ejecutar()">Ejecutar bazilio.py</button>
+    <pre id="salida" style="background:#fefbfb; color:rgb(17, 0, 255); padding:10px;"></pre>
+
+    <script>
+        async function ejecutar() {
+            let archivo = document.getElementById('archivo').value;
+            let notas = document.getElementById('codigo').value;
+            document.getElementById('salida').textContent = "Ejecutando...";
+
+            try {
+                let resp = await fetch('/ejecutar', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ archivo: archivo, notas: notas })
+                });
+                let res = await resp.json();
+                document.getElementById('salida').textContent = res.resultado;
+            } catch (e) {
+                document.getElementById('salida').textContent = "Error: Inicia 'python3 server.py' en tu terminal.";
+            }
+        }
+    </script>
+</body>
+</html>
