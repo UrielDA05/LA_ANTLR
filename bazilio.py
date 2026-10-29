@@ -327,19 +327,48 @@ def generar_salida(partitura, base, solo_ly=False, aviso=print):
             return False
         return True
 
+    # Obtener el directorio y nombre base absoluto o relativo limpio para LilyPond
+    base_dir = os.path.dirname(ruta_ly)
+    base_nombre = os.path.basename(base)
+
     pasos = [
-        (["lilypond", "-o", base, ruta_ly],
+        # Ejecutar lilypond especificando el directorio de salida de forma segura
+        (["lilypond", "-o", os.path.join(base_dir, base_nombre), ruta_ly],
          "el PDF y el MIDI", [".pdf", ".midi"]),
-        (["fluidsynth", "-ni", "-F", base + ".wav", "/usr/share/soundfonts/FluidR3_GM.sf2", base + ".midi"], "el WAV", [".wav"]),
-        (["ffmpeg", "-y", "-loglevel", "error", "-i", base + ".wav",
-          "-codec:a", "libmp3lame", "-qscale:a", "2", base + ".mp3"], "el MP3", [".mp3"]),
     ]
+    
+    # Buscar el soundfont disponible en el sistema (compatible con Debian/Ubuntu/CachyOS)
+    soundfonts = [
+        "/usr/share/sounds/sf2/FluidR3_GM.sf2",
+        "/usr/share/soundfonts/FluidR3_GM.sf2",
+        "/usr/share/soundfonts/default.sf2"
+    ]
+    sf2_path = next((sf for sf in soundfonts if os.path.exists(sf)), None)
+
+    midi_path = base + ".midi"
+    wav_path = base + ".wav"
+    mp3_path = base + ".mp3"
+
     for cmd, descripcion, extensiones in pasos:
         if not correr(cmd, descripcion):
             break
         generados += [base + e for e in extensiones]
-    return generados
 
+    # Intentar generar WAV con fluidsynth o timidity si existe el midi
+    if os.path.exists(midi_path):
+        if sf2_path and shutil.which("fluidsynth"):
+            if correr(["fluidsynth", "-ni", "-F", wav_path, sf2_path, midi_path], "el WAV"):
+                generados.append(".wav")
+        elif shutil.which("timidity"):
+            if correr(["timidity", midi_path, "-Ow", "-o", wav_path], "el WAV con timidity"):
+                generados.append(".wav")
+
+    # Intentar generar MP3 con ffmpeg si existe el WAV
+    if os.path.exists(wav_path) and shutil.which("ffmpeg"):
+        if correr(["ffmpeg", "-y", "-loglevel", "error", "-i", wav_path, "-codec:a", "libmp3lame", "-qscale:a", "2", mp3_path], "el MP3"):
+            generados.append(".mp3")
+
+    return generados
 
 def principal(argv):
     solo_ly = "--solo-ly" in argv
