@@ -317,24 +317,25 @@ def generar_salida(partitura, base, solo_ly=False, aviso=print):
             return False
         return True
 
-    # Rutas absolutas limpias para evitar errores de directorio en contenedores
-    directorio_abs = os.path.abspath(os.path.dirname(ruta_ly))
+    # Usar rutas relativas limpias compatibles con el servidor web
+    base_dir = os.path.dirname(ruta_ly)
     nombre_base = os.path.basename(base)
-    output_prefix = os.path.join(directorio_abs, nombre_base)
+    output_prefix = os.path.join(base_dir, nombre_base)
 
     # 1. Ejecutar LilyPond para generar PDF y MIDI
-    cmd_lilypond = ["lilypond", "-o", output_prefix, os.path.abspath(ruta_ly)]
+    cmd_lilypond = ["lilypond", "-o", output_prefix, ruta_ly]
     if not correr(cmd_lilypond, "el PDF y el MIDI"):
         return generados
     
-    if os.path.exists(output_prefix + ".pdf"):
-        generados.append(output_prefix + ".pdf")
-    if os.path.exists(output_prefix + ".midi"):
-        generados.append(output_prefix + ".midi")
-
+    pdf_path = base + ".pdf"
     midi_path = base + ".midi"
     wav_path = base + ".wav"
     mp3_path = base + ".mp3"
+
+    if os.path.exists(pdf_path):
+        generados.append(pdf_path)
+    if os.path.exists(midi_path):
+        generados.append(midi_path)
 
     # Buscar Soundfont en Linux
     soundfonts = [
