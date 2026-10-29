@@ -3,39 +3,79 @@ import subprocess
 import shutil
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
+import urllib.parse
 
 HTML_PAGE = """<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Compilador Bazilio</title>
+    <title>Compilador Bazilio - Entorno Integrado</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; background-color: #f9f9f9; color: #333; }
-        h2 { color: #2c3e50; }
-        label { font-weight: bold; display: block; margin-top: 15px; }
-        input[type="text"] { width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-        textarea { width: 100%; height: 150px; padding: 10px; margin-top: 5px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; }
-        button { margin-top: 15px; padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
-        button:hover { background-color: #0056b3; }
-        pre { background-color: #fff; padding: 15px; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; margin-top: 20px; font-family: monospace; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 900px; margin: 30px auto; padding: 20px; background-color: #f4f6f9; color: #333; }
+        h2 { color: #1e293b; border-bottom: 2px solid #cbd5e1; padding-bottom: 10px; }
+        label { font-weight: 600; display: block; margin-top: 15px; color: #475569; }
+        input[type="text"] { width: 100%; padding: 10px; margin-top: 5px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
+        textarea { width: 100%; height: 160px; padding: 12px; margin-top: 5px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 6px; font-family: 'Courier New', Courier, monospace; font-size: 14px; background-color: #fff; }
+        button { margin-top: 15px; padding: 12px 24px; background-color: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; font-weight: 600; transition: background 0.2s; }
+        button:hover { background-color: #1d4ed8; }
+        pre { background-color: #0f172a; color: #38bdf8; padding: 15px; border-radius: 6px; white-space: pre-wrap; word-wrap: break-word; margin-top: 20px; font-family: monospace; font-size: 13px; max-height: 200px; overflow-y: auto; }
+        
+        .seccion-resultados { margin-top: 25px; display: none; background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .reproductor-container { margin: 20px 0; background: #f8fafc; padding: 15px; border-radius: 6px; border: 1px solid #e2e8f0; }
+        audio { width: 100%; margin-top: 8px; }
+        iframe { width: 100%; height: 500px; border: 1px solid #cbd5e1; border-radius: 6px; margin-top: 10px; }
+        
+        .panel-descargas { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
+        .btn-download { display: inline-block; padding: 10px 16px; border-radius: 6px; color: #fff; text-decoration: none; font-weight: 600; font-size: 14px; text-align: center; }
+        .btn-zip { background-color: #16a34a; }
+        .btn-zip:hover { background-color: #15803d; }
+        .btn-file { background-color: #0284c7; }
+        .btn-file:hover { background-color: #0369a1; }
     </style>
 </head>
 <body>
-    <h2>Proyecto Bazilio - Compilador</h2>
-    <label for="archivo">Nombre del archivo:</label>
+
+    <h2>🎵 Compilador y Generador Musical Bazilio</h2>
+
+    <label for="archivo">Nombre de la obra / archivo:</label>
     <input type="text" id="archivo" value="novena_1" placeholder="Ej. novena_1">
-    <label for="codigo">Notas / Texto simple:</label>
-    <textarea id="codigo" placeholder="Escribe tus notas aquí..."></textarea>
-    <button onclick="procesarGramatica()">Ejecutar bazilio.py</button>
-    <pre id="salida"></pre>
+
+    <label for="codigo">Entrada de Notas o Código (.bzl):</label>
+    <textarea id="codigo" placeholder="Main |:&#10;    (:) { C D E F G A B }&#10;:|"></textarea>
+
+    <button onclick="procesarGramatica()">⚡ Procesar y Compilar en Servidor</button>
+
+    <pre id="salida">Esperando ejecución...</pre>
+
+    <div id="seccionResultados" class="seccion-resultados">
+        <h3>🎼 Resultados de la Compilación</h3>
+
+        <!-- Reproductor de Audio -->
+        <div id="contenedorAudio" class="reproductor-container" style="display:none;">
+            <h4>🔊 Reproducción de Audio Generado (.MP3 / .WAV)</h4>
+            <audio id="playerAudio" controls></audio>
+        </div>
+
+        <!-- Visor de PDF Partitura -->
+        <div id="contenedorPdf" style="display:none;">
+            <h4>📄 Partitura Generada (PDF)</h4>
+            <iframe id="framePdf"></iframe>
+        </div>
+
+        <!-- Enlaces de Descarga Directa -->
+        <div class="panel-descargas" id="panelDescargas"></div>
+    </div>
 
     <script>
         async function procesarGramatica() {
             let salida = document.getElementById('salida');
             let notas = document.getElementById('codigo').value;
             let archivo = document.getElementById('archivo').value;
-            salida.textContent = "Procesando en el servidor de Render...";
+            let seccion = document.getElementById('seccionResultados');
+
+            salida.textContent = "Procesando código, partitura y archivos de audio en Render...";
+            seccion.style.display = "none";
 
             try {
                 let response = await fetch('/ejecutar', {
@@ -43,32 +83,50 @@ HTML_PAGE = """<!DOCTYPE html>
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ archivo: archivo, notas: notas })
                 });
+
                 let data = await response.json();
                 salida.textContent = data.resultado;
+                seccion.style.display = "block";
+
+                // 1. Configurar Reproductor de Audio
+                let contAudio = document.getElementById('contenedorAudio');
+                let playerAudio = document.getElementById('playerAudio');
+                if (data.audio_url) {
+                    playerAudio.src = data.audio_url + "?t=" + new Date().getTime();
+                    contAudio.style.display = "block";
+                } else {
+                    contAudio.style.display = "none";
+                }
+
+                // 2. Configurar Visor de PDF
+                let contPdf = document.getElementById('contenedorPdf');
+                let framePdf = document.getElementById('framePdf');
+                if (data.pdf_url) {
+                    framePdf.src = data.pdf_url + "?t=" + new Date().getTime();
+                    contPdf.style.display = "block";
+                } else {
+                    contPdf.style.display = "none";
+                }
+
+                // 3. Generar Botones de Descarga
+                let panel = document.getElementById('panelDescargas');
+                panel.innerHTML = "";
 
                 if (data.zip_url) {
-                    let btnAnterior = document.getElementById('btnDescargarZip');
-                    if (btnAnterior) btnAnterior.remove();
-
-                    let btnDescarga = document.createElement('a');
-                    btnDescarga.id = 'btnDescargarZip';
-                    btnDescarga.href = data.zip_url;
-                    btnDescarga.download = true;
-                    btnDescarga.textContent = "📥 Descargar resultados comprimidos (.zip)";
-                    btnDescarga.style.display = "block";
-                    btnDescarga.style.marginTop = "15px";
-                    btnDescarga.style.padding = "12px";
-                    btnDescarga.style.background = "#28a745";
-                    btnDescarga.style.color = "#fff";
-                    btnDescarga.style.textAlign = "center";
-                    btnDescarga.style.textDecoration = "none";
-                    btnDescarga.style.borderRadius = "5px";
-                    btnDescarga.style.fontWeight = "bold";
-
-                    salida.parentNode.appendChild(btnDescarga);
+                    panel.innerHTML += `<a href="${data.zip_url}" download class="btn-download btn-zip">📦 Descargar Paquete Completo (.ZIP)</a>`;
                 }
+                if (data.pdf_url) {
+                    panel.innerHTML += `<a href="${data.pdf_url}" download class="btn-download btn-file">📄 Descargar PDF</a>`;
+                }
+                if (data.audio_url) {
+                    panel.innerHTML += `<a href="${data.audio_url}" download class="btn-download btn-file">🎧 Descargar Audio</a>`;
+                }
+                if (data.bzl_url) {
+                    panel.innerHTML += `<a href="${data.bzl_url}" download class="btn-download btn-file">📜 Descargar .BZL</a>`;
+                }
+
             } catch (err) {
-                salida.textContent = "Error de conexión: " + err.message;
+                salida.textContent = "Error al conectar con el servidor: " + err.message;
             }
         }
     </script>
@@ -82,19 +140,26 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Content-Type', 'text/html; charset=utf-8')
             self.end_headers()
             self.wfile.write(HTML_PAGE.encode('utf-8'))
-        elif self.path.endswith('.zip'):
-            zip_file = self.path.lstrip('/')
-            if os.path.exists(zip_file):
-                self.send_response(200)
+            return
+
+        ruta_limpia = urllib.parse.unquote(self.path.lstrip('/'))
+        if os.path.exists(ruta_limpia) and os.path.isfile(ruta_limpia):
+            self.send_response(200)
+            if ruta_limpia.endswith('.pdf'):
+                self.send_header('Content-Type', 'application/pdf')
+            elif ruta_limpia.endswith('.mp3'):
+                self.send_header('Content-Type', 'audio/mpeg')
+            elif ruta_limpia.endswith('.wav'):
+                self.send_header('Content-Type', 'audio/wav')
+            elif ruta_limpia.endswith('.zip'):
                 self.send_header('Content-Type', 'application/zip')
-                self.send_header('Content-Disposition', f'attachment; filename="{os.path.basename(zip_file)}"')
-                self.end_headers()
-                with open(zip_file, 'rb') as f:
-                    self.wfile.write(f.read())
+                self.send_header('Content-Disposition', f'attachment; filename="{os.path.basename(ruta_limpia)}"')
             else:
-                self.send_response(404)
-                self.end_headers()
-                self.wfile.write(b"Archivo ZIP no encontrado.")
+                self.send_header('Content-Type', 'text/plain; charset=utf-8')
+                
+            self.end_headers()
+            with open(ruta_limpia, 'rb') as f:
+                self.wfile.write(f.read())
         else:
             self.send_response(404)
             self.end_headers()
@@ -122,23 +187,33 @@ class Handler(BaseHTTPRequestHandler):
             with open(ruta_bzl, "w", encoding="utf-8") as f:
                 f.write(codigo_bzl)
 
-            # Ejecutar el compilador
+            # Ejecutar compilador bazilio.py
             cmd = ["python3", "bazilio.py", ruta_bzl]
             res = subprocess.run(cmd, capture_output=True, text=True)
-            salida = res.stderr.strip() if res.stderr else res.stdout.strip()
+            salida_consola = f"STDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}".strip()
             
-            # Comprimir carpeta de resultados
+            # Buscar archivos generados en la carpeta
+            archivos_carpeta = os.listdir(dir_propio) if os.path.exists(dir_propio) else []
+            
+            pdf_path = next((os.path.join(dir_propio, f) for f in archivos_carpeta if f.endswith('.pdf')), None)
+            audio_path = next((os.path.join(dir_propio, f) for f in archivos_carpeta if f.endswith(('.mp3', '.wav'))), None)
+            
+            # Empaquetar todo en ZIP
             zip_path = f"{dir_propio}"
-            shutil.make_archive(zip_path, 'zip', dir_propio)
+            if os.path.exists(dir_propio):
+                shutil.make_archive(zip_path, 'zip', dir_propio)
             
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
             
-            msg = f"[ÉXITO] Procesado correctamente en el servidor.\n\n{salida}"
+            msg = f"[EJECUCIÓN COMPLETADA]\n\n{salida_consola}"
             respuesta = {
                 'resultado': msg,
-                'zip_url': f"/{dir_propio}.zip"
+                'zip_url': f"/{dir_propio}.zip" if os.path.exists(f"{zip_path}.zip") else None,
+                'bzl_url': f"/{ruta_bzl}",
+                'pdf_url': f"/{pdf_path}" if pdf_path else None,
+                'audio_url': f"/{audio_path}" if audio_path else None
             }
             self.wfile.write(json.dumps(respuesta).encode('utf-8'))
 
