@@ -281,12 +281,11 @@ def nota_a_lilypond(valor):
     marcas = "'" * (octava - 3) if octava > 3 else "," * (3 - octava)
     return f"{letra}{marcas}4"
 
-
 def texto_lilypond(partitura, tempo=120):
     notas = [nota_a_lilypond(v) for v in partitura]
     renglones = [" ".join(notas[i:i + 8]) for i in range(0, len(notas), 8)]
     cuerpo = "\n".join("      " + r for r in renglones)
-    # Versión estricta fija e inalterable para LilyPond 2.24.4
+    # Versión estricta garantizada para LilyPond 2.24.4
     return (
         '\\version "2.24.4"\n'
         "\\score {\n"
@@ -298,6 +297,7 @@ def texto_lilypond(partitura, tempo=120):
         "  \\midi { }\n"
         "}\n"
     )
+
 
 def generar_salida(partitura, base, solo_ly=False, aviso=print):
     ruta_ly = base + ".ly"
@@ -318,13 +318,12 @@ def generar_salida(partitura, base, solo_ly=False, aviso=print):
             return False
         return True
 
-    # Usar rutas relativas limpias compatibles con el servidor web
-    base_dir = os.path.dirname(ruta_ly)
-    nombre_base = os.path.basename(base)
-    output_prefix = os.path.join(base_dir, nombre_base)
+    # Usar rutas absolutas limpias para evitar errores de interpretación en Docker
+    ruta_ly_abs = os.path.abspath(ruta_ly)
+    base_abs = os.path.abspath(base)
 
-    # 1. Ejecutar LilyPond para generar PDF y MIDI
-    cmd_lilypond = ["lilypond", "-o", output_prefix, ruta_ly]
+    # 1. Ejecutar LilyPond con rutas absolutas exactas
+    cmd_lilypond = ["lilypond", "-o", base_abs, ruta_ly_abs]
     if not correr(cmd_lilypond, "el PDF y el MIDI"):
         return generados
     
@@ -361,7 +360,6 @@ def generar_salida(partitura, base, solo_ly=False, aviso=print):
             generados.append(mp3_path)
 
     return generados
-
 
 def principal(argv):
     solo_ly = "--solo-ly" in argv
