@@ -44,7 +44,6 @@ _POSICION = {"C": 0, "D": 1, "E": 2, "F": 3, "G": 4, "A": 5, "B": 6}
 
 
 def valor_nota(texto):
-    """'C4' -> 23, 'C' -> 23 (Do central), 'A0' -> 0, 'C8' -> 51."""
     letra = texto[0]
     octava = int(texto[1]) if len(texto) == 2 else 4
     if octava == 0:
@@ -61,9 +60,9 @@ def valor_nota(texto):
 
 class Interprete(BazilioVisitor):
     def __init__(self, entrada=None, salida=None):
-        self.procedimientos = {}      # nombre -> (parámetros, bloque)
-        self.marcos = []              # pila de variables
-        self.partitura = []           # valores de notas tocadas
+        self.procedimientos = {}
+        self.marcos = []
+        self.partitura = []
         self._entrada = entrada if entrada is not None else sys.stdin
         self._tokens_entrada = []
         self._salida = salida if salida is not None else print
@@ -108,7 +107,7 @@ class Interprete(BazilioVisitor):
     def visitAsignacion(self, ctx):
         valor = self.visit(ctx.expr())
         if isinstance(valor, list):
-            valor = list(valor)           # copia la lista
+            valor = list(valor)
         self._vars[ctx.VAR().getText()] = valor
 
     def visitLectura(self, ctx):
@@ -283,20 +282,12 @@ def nota_a_lilypond(valor):
     return f"{letra}{marcas}4"
 
 
-def version_lilypond():
-    try:
-        salida = subprocess.run(
-            ["lilypond", "--version"], capture_output=True, text=True).stdout
-        return re.search(r"(\d+\.\d+\.\d+)", salida).group(1)
-    except (OSError, AttributeError):
-        return "2.20.0"
-
-
 def texto_lilypond(partitura, tempo=120):
     notas = [nota_a_lilypond(v) for v in partitura]
     renglones = [" ".join(notas[i:i + 8]) for i in range(0, len(notas), 8)]
     cuerpo = "\n".join("      " + r for r in renglones)
-    return (f'\\version "{version_lilypond()}"\n'
+    # Versión estática garantizada para la 2.24.4 de Docker
+    return ('\\version "2.24.4"\n'
             "\\score {\n"
             "  \\absolute {\n"
             f"    \\tempo 4 = {tempo}\n"
@@ -317,8 +308,7 @@ def generar_salida(partitura, base, solo_ly=False, aviso=print):
 
     def correr(cmd, descripcion):
         if shutil.which(cmd[0]) is None:
-            aviso(
-                f"Aviso: no se encontró «{cmd[0]}», no se generó {descripcion}.")
+            aviso(f"Aviso: no se encontró «{cmd[0]}», no se generó {descripcion}.")
             return False
         r = subprocess.run(cmd, capture_output=True, text=True)
         if r.returncode != 0:
@@ -327,17 +317,26 @@ def generar_salida(partitura, base, solo_ly=False, aviso=print):
             return False
         return True
 
-    # Obtener el directorio y nombre base absoluto o relativo limpio para LilyPond
-    base_dir = os.path.dirname(ruta_ly)
-    base_nombre = os.path.basename(base)
+    # Rutas absolutas limpias para evitar errores de directorio en contenedores
+    directorio_abs = os.path.abspath(os.path.dirname(ruta_ly))
+    nombre_base = os.path.basename(base)
+    output_prefix = os.path.join(directorio_abs, nombre_base)
 
-    pasos = [
-        # Ejecutar lilypond especificando el directorio de salida de forma segura
-        (["lilypond", "-o", os.path.join(base_dir, base_nombre), ruta_ly],
-         "el PDF y el MIDI", [".pdf", ".midi"]),
-    ]
+    # 1. Ejecutar LilyPond para generar PDF y MIDI
+    cmd_lilypond = ["lilypond", "-o", output_prefix, os.path.abspath(ruta_ly)]
+    if not correr(cmd_lilypond, "el PDF y el MIDI"):
+        return generados
     
-    # Buscar el soundfont disponible en el sistema (compatible con Debian/Ubuntu/CachyOS)
+    if os.path.exists(output_prefix + ".pdf"):
+        generados.append(output_prefix + ".pdf")
+    if os.path.exists(output_prefix + ".midi"):
+        generados.append(output_prefix + ".midi")
+
+    midi_path = base + ".midi"
+    wav_path = base + ".wav"
+    mp3_path = base + ".mp3"
+
+    # Buscar Soundfont en Linux
     soundfonts = [
         "/usr/share/sounds/sf2/FluidR3_GM.sf2",
         "/usr/share/soundfonts/FluidR3_GM.sf2",
@@ -345,37 +344,28 @@ def generar_salida(partitura, base, solo_ly=False, aviso=print):
     ]
     sf2_path = next((sf for sf in soundfonts if os.path.exists(sf)), None)
 
-    midi_path = base + ".midi"
-    wav_path = base + ".wav"
-    mp3_path = base + ".mp3"
-
-    for cmd, descripcion, extensiones in pasos:
-        if not correr(cmd, descripcion):
-            break
-        generados += [base + e for e in extensiones]
-
-    # Intentar generar WAV con fluidsynth o timidity si existe el midi
+    # 2. Generar WAV con FluidSynth o Timidity
     if os.path.exists(midi_path):
         if sf2_path and shutil.which("fluidsynth"):
             if correr(["fluidsynth", "-ni", "-F", wav_path, sf2_path, midi_path], "el WAV"):
-                generados.append(".wav")
+                generados.append(wav_path)
         elif shutil.which("timidity"):
             if correr(["timidity", midi_path, "-Ow", "-o", wav_path], "el WAV con timidity"):
-                generados.append(".wav")
+                generados.append(wav_path)
 
-    # Intentar generar MP3 con ffmpeg si existe el WAV
+    # 3. Generar MP3 con FFmpeg
     if os.path.exists(wav_path) and shutil.which("ffmpeg"):
         if correr(["ffmpeg", "-y", "-loglevel", "error", "-i", wav_path, "-codec:a", "libmp3lame", "-qscale:a", "2", mp3_path], "el MP3"):
-            generados.append(".mp3")
+            generados.append(mp3_path)
 
     return generados
+
 
 def principal(argv):
     solo_ly = "--solo-ly" in argv
     args = [a for a in argv[1:] if not a.startswith("--")]
     if not args:
-        print(
-            "Uso: python3 bazilio.py programa.bzl [Procedimiento] [--solo-ly]")
+        print("Uso: python3 bazilio.py programa.bzl [Procedimiento] [--solo-ly]")
         return 2
     ruta = args[0]
     inicio = args[1] if len(args) > 1 else "Main"
@@ -386,8 +376,7 @@ def principal(argv):
         interprete.ejecutar(inicio)
         if interprete.partitura:
             base = os.path.splitext(ruta)[0]
-            archivos = generar_salida(
-                interprete.partitura, base, solo_ly=solo_ly)
+            archivos = generar_salida(interprete.partitura, base, solo_ly=solo_ly)
             nombres = ", ".join(os.path.basename(a) for a in archivos)
             print("Archivos generados: " + nombres, file=sys.stderr)
     except ErrorBazilio as e:
@@ -402,8 +391,7 @@ if __name__ == "__main__":
     sys.setrecursionlimit(200000)
     threading.stack_size(512 * 1024 * 1024)
     resultado = []
-    hilo = threading.Thread(
-        target=lambda: resultado.append(principal(sys.argv)))
+    hilo = threading.Thread(target=lambda: resultado.append(principal(sys.argv)))
     hilo.start()
     hilo.join()
     sys.exit(resultado[0] if resultado else 1)

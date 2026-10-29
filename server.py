@@ -53,7 +53,7 @@ HTML_PAGE = """<!DOCTYPE html>
 
         <!-- Reproductor de Audio -->
         <div id="contenedorAudio" class="reproductor-container" style="display:none;">
-            <h4>🔊 Reproducción de Audio Generado (.MP3 / .WAV)</h4>
+            <h4>🔊 Reproducción de Audio Generado (.MP3)</h4>
             <audio id="playerAudio" controls></audio>
         </div>
 
@@ -74,7 +74,7 @@ HTML_PAGE = """<!DOCTYPE html>
             let archivo = document.getElementById('archivo').value;
             let seccion = document.getElementById('seccionResultados');
 
-            salida.textContent = "Procesando código, partitura y archivos de audio en Render...";
+            salida.textContent = "Procesando código, partitura y archivos de audio en el servidor...";
             seccion.style.display = "none";
 
             try {
@@ -119,7 +119,7 @@ HTML_PAGE = """<!DOCTYPE html>
                     panel.innerHTML += `<a href="${data.pdf_url}" download class="btn-download btn-file">📄 Descargar PDF</a>`;
                 }
                 if (data.audio_url) {
-                    panel.innerHTML += `<a href="${data.audio_url}" download class="btn-download btn-file">🎧 Descargar Audio</a>`;
+                    panel.innerHTML += `<a href="${data.audio_url}" download class="btn-download btn-file">🎧 Descargar MP3</a>`;
                 }
                 if (data.bzl_url) {
                     panel.innerHTML += `<a href="${data.bzl_url}" download class="btn-download btn-file">📜 Descargar .BZL</a>`;
@@ -192,11 +192,13 @@ class Handler(BaseHTTPRequestHandler):
             res = subprocess.run(cmd, capture_output=True, text=True)
             salida_consola = f"STDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}".strip()
             
-            # Buscar archivos generados en la carpeta
+            # Buscar archivos generados
             archivos_carpeta = os.listdir(dir_propio) if os.path.exists(dir_propio) else []
             
             pdf_path = next((os.path.join(dir_propio, f) for f in archivos_carpeta if f.endswith('.pdf')), None)
-            audio_path = next((os.path.join(dir_propio, f) for f in archivos_carpeta if f.endswith(('.mp3', '.wav'))), None)
+            audio_path = next((os.path.join(dir_propio, f) for f in archivos_carpeta if f.endswith('.mp3')), None)
+            if not audio_path:
+                audio_path = next((os.path.join(dir_propio, f) for f in archivos_carpeta if f.endswith('.wav')), None)
             
             # Empaquetar todo en ZIP
             zip_path = f"{dir_propio}"
