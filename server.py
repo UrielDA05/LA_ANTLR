@@ -10,9 +10,9 @@ HTML_PAGE = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Compilador Bazilio - Entorno Integrado</title>
+    <title>Compilador Bazilio - Descargas</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 900px; margin: 30px auto; padding: 20px; background-color: #f4f6f9; color: #333; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; background-color: #f4f6f9; color: #333; }
         h2 { color: #1e293b; border-bottom: 2px solid #cbd5e1; padding-bottom: 10px; }
         label { font-weight: 600; display: block; margin-top: 15px; color: #475569; }
         input[type="text"] { width: 100%; padding: 10px; margin-top: 5px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
@@ -22,12 +22,8 @@ HTML_PAGE = """<!DOCTYPE html>
         pre { background-color: #0f172a; color: #38bdf8; padding: 15px; border-radius: 6px; white-space: pre-wrap; word-wrap: break-word; margin-top: 20px; font-family: monospace; font-size: 13px; max-height: 200px; overflow-y: auto; }
         
         .seccion-resultados { margin-top: 25px; display: none; background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
-        .reproductor-container { margin: 20px 0; background: #f8fafc; padding: 15px; border-radius: 6px; border: 1px solid #e2e8f0; }
-        audio { width: 100%; margin-top: 8px; }
-        iframe { width: 100%; height: 500px; border: 1px solid #cbd5e1; border-radius: 6px; margin-top: 10px; }
-        
         .panel-descargas { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
-        .btn-download { display: inline-block; padding: 10px 16px; border-radius: 6px; color: #fff; text-decoration: none; font-weight: 600; font-size: 14px; text-align: center; }
+        .btn-download { display: inline-block; padding: 12px 20px; border-radius: 6px; color: #fff; text-decoration: none; font-weight: 600; font-size: 14px; text-align: center; }
         .btn-zip { background-color: #16a34a; }
         .btn-zip:hover { background-color: #15803d; }
         .btn-file { background-color: #0284c7; }
@@ -44,26 +40,12 @@ HTML_PAGE = """<!DOCTYPE html>
     <label for="codigo">Entrada de Notas o Código (.bzl):</label>
     <textarea id="codigo" placeholder="Main |:&#10;    (:) { C D E F G A B }&#10;:|"></textarea>
 
-    <button onclick="procesarGramatica()">⚡ Procesar y Compilar en Servidor</button>
+    <button onclick="procesarGramatica()">⚡ Procesar y Compilar</button>
 
     <pre id="salida">Esperando ejecución...</pre>
 
     <div id="seccionResultados" class="seccion-resultados">
-        <h3>🎼 Resultados de la Compilación</h3>
-
-        <!-- Reproductor de Audio -->
-        <div id="contenedorAudio" class="reproductor-container" style="display:none;">
-            <h4>🔊 Reproducción de Audio Generado (.MP3)</h4>
-            <audio id="playerAudio" controls></audio>
-        </div>
-
-        <!-- Visor de PDF Partitura -->
-        <div id="contenedorPdf" style="display:none;">
-            <h4>📄 Partitura Generada (PDF)</h4>
-            <iframe id="framePdf"></iframe>
-        </div>
-
-        <!-- Enlaces de Descarga Directa -->
+        <h3>📥 Archivos Listos para Descarga</h3>
         <div class="panel-descargas" id="panelDescargas"></div>
     </div>
 
@@ -74,7 +56,7 @@ HTML_PAGE = """<!DOCTYPE html>
             let archivo = document.getElementById('archivo').value;
             let seccion = document.getElementById('seccionResultados');
 
-            salida.textContent = "Procesando código, partitura y archivos de audio en el servidor...";
+            salida.textContent = "Procesando código, partitura y audios en el servidor...";
             seccion.style.display = "none";
 
             try {
@@ -88,27 +70,6 @@ HTML_PAGE = """<!DOCTYPE html>
                 salida.textContent = data.resultado;
                 seccion.style.display = "block";
 
-                // 1. Configurar Reproductor de Audio
-                let contAudio = document.getElementById('contenedorAudio');
-                let playerAudio = document.getElementById('playerAudio');
-                if (data.audio_url) {
-                    playerAudio.src = data.audio_url + "?t=" + new Date().getTime();
-                    contAudio.style.display = "block";
-                } else {
-                    contAudio.style.display = "none";
-                }
-
-                // 2. Configurar Visor de PDF
-                let contPdf = document.getElementById('contenedorPdf');
-                let framePdf = document.getElementById('framePdf');
-                if (data.pdf_url) {
-                    framePdf.src = data.pdf_url + "?t=" + new Date().getTime();
-                    contPdf.style.display = "block";
-                } else {
-                    contPdf.style.display = "none";
-                }
-
-                // 3. Generar Botones de Descarga
                 let panel = document.getElementById('panelDescargas');
                 panel.innerHTML = "";
 
@@ -192,7 +153,6 @@ class Handler(BaseHTTPRequestHandler):
             res = subprocess.run(cmd, capture_output=True, text=True)
             salida_consola = f"STDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}".strip()
             
-            # Buscar archivos generados
             archivos_carpeta = os.listdir(dir_propio) if os.path.exists(dir_propio) else []
             
             pdf_path = next((os.path.join(dir_propio, f) for f in archivos_carpeta if f.endswith('.pdf')), None)
@@ -200,7 +160,6 @@ class Handler(BaseHTTPRequestHandler):
             if not audio_path:
                 audio_path = next((os.path.join(dir_propio, f) for f in archivos_carpeta if f.endswith('.wav')), None)
             
-            # Empaquetar todo en ZIP
             zip_path = f"{dir_propio}"
             if os.path.exists(dir_propio):
                 shutil.make_archive(zip_path, 'zip', dir_propio)
