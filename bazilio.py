@@ -286,7 +286,7 @@ def texto_lilypond(partitura, tempo=120):
     notas = [nota_a_lilypond(v) for v in partitura]
     renglones = [" ".join(notas[i:i + 8]) for i in range(0, len(notas), 8)]
     cuerpo = "\n".join("      " + r for r in renglones)
-    # Versión estricta obligatoria para LilyPond 2.24.4 en Docker
+    # Versión estricta fija e inalterable para LilyPond 2.24.4
     return (
         '\\version "2.24.4"\n'
         "\\score {\n"
