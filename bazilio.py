@@ -286,17 +286,18 @@ def texto_lilypond(partitura, tempo=120):
     notas = [nota_a_lilypond(v) for v in partitura]
     renglones = [" ".join(notas[i:i + 8]) for i in range(0, len(notas), 8)]
     cuerpo = "\n".join("      " + r for r in renglones)
-    # Versión estática garantizada para la 2.24.4 de Docker
-    return ('\\version "2.24.4"\n'
-            "\\score {\n"
-            "  \\absolute {\n"
-            f"    \\tempo 4 = {tempo}\n"
-            f"{cuerpo}\n"
-            "  }\n"
-            "  \\layout { }\n"
-            "  \\midi { }\n"
-            "}\n")
-
+    # Versión estricta obligatoria para LilyPond 2.24.4 en Docker
+    return (
+        '\\version "2.24.4"\n'
+        "\\score {\n"
+        "  \\absolute {\n"
+        f"    \\tempo 4 = {tempo}\n"
+        f"{cuerpo}\n"
+        "  }\n"
+        "  \\layout { }\n"
+        "  \\midi { }\n"
+        "}\n"
+    )
 
 def generar_salida(partitura, base, solo_ly=False, aviso=print):
     ruta_ly = base + ".ly"
